@@ -1,0 +1,187 @@
+defmodule TaskManager.Cli do
+  alias TaskManager.Tasks
+
+  def start() do
+    loop()
+  end
+
+  def loop() do
+    display_menu()
+    handle_input()
+    loop()
+  end
+
+  def continue() do
+    IO.puts("Press Enter to continue...")
+    IO.gets("")
+  end
+
+  def display_menu() do
+    IO.puts """
+    Task Management System
+
+    1. View All Tasks
+    2. Add a Task
+    3. Edit a Task
+    4. Delete a Task
+    5. Exit
+    """
+  end
+
+  def handle_input() do
+    IO.puts "Enter your choice: "
+    input = IO.gets("") |> String.trim()
+    pick_task(input)
+  end
+
+  def pick_task("1"), do: view_all_tasks()
+  def pick_task("2"), do: add_task()
+  def pick_task("3"), do: edit_task()
+  def pick_task("4"), do: delete_task()
+  def pick_task("5"), do: exit_program()
+  def pick_task(_), do: IO.puts("Wrong input, try again!")
+
+  def view_all_tasks() do
+    Tasks.list_tasks()
+    |> Enum.each(&display_task/1)
+    continue()
+  end
+
+  defp display_task(%TaskManager.Tasks.Task{id: _id, title: title, status: status, description: description, due_date: due_date, inserted_at: _inserted_at, updated_at: _updated_at}) do
+    IO.puts("#{title}, #{status}, #{description}, #{due_date}")
+  end
+
+  def add_task() do
+    task_params = get_task_params()
+    case Tasks.create_task(task_params) do
+      {:ok, _} -> IO.puts("Task added successfully.")
+      {:error, changeset} -> IO.puts("Failed to add task: #{inspect(changeset.errors)}")
+    end
+    continue()
+  end
+
+  defp get_task_params() do
+    IO.puts "Enter Title: "
+    title = IO.gets("") |> String.trim()
+
+    IO.puts "Enter Description: "
+    description = IO.gets("") |> String.trim()
+
+    due_date = get_due_date()
+
+    %{title: title, status: "Not Started", description: description, due_date: due_date}
+  end
+
+  defp get_due_date() do
+    due_date = get_input("Enter Due Date (YYYY-MM-DD): ")
+    case Date.from_iso8601(due_date) do
+      {:ok, _date} -> due_date
+      _ ->
+        IO.puts("Invalid date format. Please enter the date in the format YYYY-MM-DD.")
+        get_new_value(:due_date)  # Recursively call the function again
+    end
+  end
+
+  def edit_task() do
+    IO.puts("""
+    Edit options:
+
+    1. Edit a Title
+    2. Edit a Status
+    3. Edit a Description
+    4. Edit a Due Date
+    5. Main menu
+    """)
+
+    IO.puts "Enter your choice: "
+    input = IO.gets("") |> String.trim()
+
+    pick_edit(input)
+  end
+
+  def pick_edit("1"), do: edit_task_field(:title)
+  def pick_edit("2"), do: edit_task_field(:status)
+  def pick_edit("3"), do: edit_task_field(:description)
+  def pick_edit("4"), do: edit_task_field(:due_date)
+  def pick_edit("5"), do: loop()
+  def pick_edit(_), do: IO.puts("Wrong input, try again!")
+
+  def edit_task_field(field) do
+    show_id()
+    IO.puts("Enter id of task to edit: ")
+    id = IO.gets("") |> String.trim()
+    task = Tasks.get_task!(id)
+    new_value = get_new_value(field)
+    attrs = Map.put(%{}, field, new_value)
+
+    case Tasks.update_task(task, attrs) do
+      {:ok, _} -> IO.puts("#{String.capitalize(to_string(field))} updated successfully")
+      {:error, changeset} -> IO.puts("Failed to update task: #{inspect(changeset.errors)}")
+    end
+    continue()
+  end
+
+  defp get_new_value(:title), do: get_input("Enter new title: ")
+  defp get_new_value(:description), do: get_input("Enter new description: ")
+  defp get_new_value(:due_date) do
+    new_due_date = get_input("Enter new due date (YYYY-MM-DD): ")
+    case Date.from_iso8601(new_due_date) do
+      {:ok, _date} -> new_due_date
+      _ ->
+        IO.puts("Invalid date format. Please enter the date in the format YYYY-MM-DD.")
+        get_new_value(:due_date)  # Recursively call the function again
+    end
+  end
+
+  defp get_new_value(:status) do
+    IO.puts("""
+    Pick new Status:
+
+    0 - "Not Started"
+    1 - "In Progress"
+    2 - "Done"
+    """)
+    get_input("Enter new status: ")
+    |> status()
+
+  end
+
+  defp get_input(prompt) do
+    IO.puts(prompt)
+    IO.gets("") |> String.trim()
+  end
+
+  def show_id() do
+    Tasks.list_tasks()
+    |> Enum.each(&display_task_id/1)
+  end
+
+  defp display_task_id(%TaskManager.Tasks.Task{id: id, title: title, status: _status}) do
+    IO.puts("- #{id} #{title}")
+  end
+
+  def delete_task() do
+    show_id()
+
+    IO.puts("Enter id of task to delete: ")
+    id = IO.gets("") |> String.trim()
+    task = Tasks.get_task!(id)
+
+    case Tasks.delete_task(task) do
+      {:ok, _} -> IO.puts("Task deleted successfully")
+      {:error, changeset} -> IO.puts("Failed to delete task: #{inspect(changeset.errors)}")
+    end
+    continue()
+  end
+
+  defp status("0"), do: "Not Started"
+  defp status("1"), do: "In Progress"
+  defp status("2"), do: "Done"
+  defp status(_), do: "Not Started"
+
+
+  def exit_program() do
+    IO.puts "Exiting..."
+    System.halt(0)
+  end
+end

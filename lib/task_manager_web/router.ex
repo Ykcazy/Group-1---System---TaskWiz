@@ -20,6 +20,10 @@ defmodule TaskManagerWeb.Router do
     get "/", PageController, :home
   end
 
+  scope "/api", TaskManagerWeb do
+    pipe_through :api
+    resources "/tasks", TaskController, except: [:new, :edit]
+  end
   # Other scopes may use custom stacks.
   # scope "/api", TaskManagerWeb do
   #   pipe_through :api
