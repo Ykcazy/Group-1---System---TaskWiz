@@ -94,21 +94,26 @@ defmodule TaskManager.Cli do
   @doc """
   Displays all tasks.
   """
-  def view_all_tasks() do
-    if Enum.empty?(Tasks.list_tasks()) do
-      IO.puts("No tasks available.")
-    else
-      IO.puts("\n\n=== MY TASKS ===\n")
+def view_all_tasks() do
+  tasks = Tasks.list_tasks()
 
-      header = ["ID", "Title", "Status", "Description", "Due Date"]
-      rows = Tasks.list_tasks()
-             |> Enum.map(&display_task/1)
+  if Enum.empty?(tasks) do
+    IO.puts("No tasks available.")
+  else
+    IO.puts("\n\n=== MY TASKS ===\n")
 
-      Table.new(rows, header)
-      |> Table.render!(horizontal_style: :all, top_frame_symbol: "+", header_separator_symbol: "=", horizontal_symbol: "-", vertical_symbol: "|")
-      |> IO.puts
-    end
+    header = ["Number", "ID", "Title", "Status", "Description", "Due Date"]
+    rows = Enum.with_index(tasks)
+           |> Enum.map(fn {task, idx} -> [idx + 1 | display_task(task)] end)
+
+    Table.new(rows, header)
+    |> Table.render!(horizontal_style: :all, top_frame_symbol: "+", header_separator_symbol: "=", horizontal_symbol: "-", vertical_symbol: "|")
+    |> IO.puts
+
+    {tasks}
   end
+end
+
 
   @doc """
   Adds a new task.
@@ -274,18 +279,24 @@ defmodule TaskManager.Cli do
   @doc """
   Deletes an existing task.
   """
-  def delete_task() do
-    view_all_tasks()
-    IO.puts("\n\n===== DELETE A TASK =====\n")
-    IO.puts("\nEnter ID of task to delete: ")
-    id = IO.gets("") |> String.trim()
-    task = Tasks.get_task!(id)
+ def delete_task() do
+  {tasks} = view_all_tasks()
 
+  IO.puts("\n\n===== DELETE A TASK =====\n")
+  IO.puts("\nEnter number of task to delete: ")
+  number = IO.gets("") |> String.trim() |> String.to_integer()
+
+  if number > 0 && number <= length(tasks) do
+    task = Enum.at(tasks, number - 1)
     case Tasks.delete_task(task) do
       {:ok, _} -> IO.puts("\nTask deleted successfully.")
       {:error, changeset} -> IO.puts("\nFailed to delete task: #{inspect(changeset.errors)}")
     end
-    continue()
+  else
+    IO.puts("\nInvalid task number.")
+  end
+
+  continue()
   end
 
   @doc """
