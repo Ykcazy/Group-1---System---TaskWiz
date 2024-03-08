@@ -1,5 +1,4 @@
 defmodule TaskManager.Cli do
-
   @moduledoc """
   Command Line Interface for Task Management System
 
@@ -81,11 +80,12 @@ defmodule TaskManager.Cli do
   def pick_task("3"), do: edit_task()
   def pick_task("4"), do: delete_task()
   def pick_task("5"), do: exit_program()
-  def pick_task(_), do: IO.puts("\nERROR! Wrong input. Please try again.")
+  def pick_task(_) do
+    IO.puts("\nERROR! Wrong input. Please try again.")
+    continue()
+  end
 
-  @doc """
-  Displays a task in a formatted table.
-  """
+
   defp display_task(%TaskManager.Tasks.Task{id: id, title: title, status: status,
   description: description, due_date: due_date}) do
     [id, title, status, description, due_date]
@@ -128,24 +128,46 @@ end
     continue()
   end
 
-  @doc """
-  Gets task parameters from user input.
-  """
-  defp get_task_params() do
-    IO.puts "\nEnter Title: "
-    title = IO.gets("") |> String.trim()
 
-    IO.puts "\nEnter Description: "
-    description = IO.gets("") |> String.trim()
+  defp get_task_params() do
+
+    title = get_task_title()
+
+    description = get_task_description()
 
     due_date = get_due_date()
 
     %{title: title, status: "Not Started", description: description, due_date: due_date}
   end
 
-  @doc """
-  Gets the due date from user input.
-  """
+
+  defp get_task_title() do
+    IO.puts "\nEnter Title: "
+    title = IO.gets("") |> String.trim()
+
+    if String.length(title) > 0 do
+      title
+    else
+      IO.puts ("\nTitle cannot be empty. Please enter a title.")
+      continue()
+      get_task_title()
+    end
+  end
+
+  defp get_task_description() do
+    IO.puts ("\nEnter Description: ")
+    continue()
+    description = IO.gets("") |> String.trim()
+
+    if String.length(description) > 0 do
+      description
+    else
+      IO.puts ("\nDescription cannot be empty. Please enter a description.")
+      continue()
+      get_task_description()
+    end
+  end
+
   defp get_due_date() do
     IO.puts "\nEnter Due Date (YYYY-MM-DD): "
     today = Date.utc_today()
@@ -156,12 +178,14 @@ end
         if Date.compare(entered_date, today) >= 0 do
           due_date
         else
-          IO.puts "\nDue date must be today or in the future."
+          IO.puts ("\nDue date must be today or in the future.")
+          continue()
           get_due_date()  # Recursively call the function again
         end
 
       _ ->
-        IO.puts "\nInvalid date format. Please enter the date in the format YYYY-MM-DD."
+        IO.puts ("\nInvalid date format. Please enter the date in the format YYYY-MM-DD.")
+        continue()
         get_due_date()  # Recursively call the function again
     end
   end
@@ -196,55 +220,84 @@ end
   def pick_edit("3"), do: edit_task_field(:description)
   def pick_edit("4"), do: edit_task_field(:due_date)
   def pick_edit("5"), do: loop()
-  def pick_edit(_), do: IO.puts("\nERROR! Wrong input. Please try again.")
+  def pick_edit(_) do
+    IO.puts("\nERROR! Wrong input. Please try again.")
+    continue()
+    edit_task()
+  end
 
   @doc """
   Edits a specific field of a task.
   """
-  def edit_task_field(field) do
-    view_all_tasks()
-    IO.puts("\nEnter ID of task to edit: ")
-    id = IO.gets("") |> String.trim()
-    task = Tasks.get_task!(id)
-    new_value = get_new_value(field)
-    attrs = Map.put(%{}, field, new_value)
+def edit_task_field(field) do
+  {tasks} = view_all_tasks()
 
-    case Tasks.update_task(task, attrs) do
-      {:ok, _} -> IO.puts("\n#{String.capitalize(to_string(field))} updated successfully.")
-      {:error, changeset} -> IO.puts("\nFailed to update task: #{inspect(changeset.errors)}")
+  IO.puts("\nEnter number of task to edit: ")
+  input = IO.gets("") |> String.trim()
+
+  case Integer.parse(input) do
+    {:error, _} ->
+      IO.puts("\nInvalid input. Please enter a number.")
+      continue()
+      edit_task_field(field)
+    {number, _} when number > 0 ->
+      case number <= length(tasks) do
+        true ->
+          task = Enum.at(tasks, number - 1)
+          new_value = get_new_value(field)
+          attrs = Map.put(%{}, field, new_value)
+
+          case Tasks.update_task(task, attrs) do
+            {:ok, _} ->
+              IO.puts("\n#{String.capitalize(to_string(field))} updated successfully.")
+              continue()
+            {:error, changeset} ->
+              IO.puts("\nFailed to update task: #{inspect(changeset.errors)}")
+              continue()
+          end
+        false ->
+          IO.puts("\nInvalid task number.")
+          continue()
+          edit_task_field(field)
+      end
+    _ ->
+      IO.puts("\nInvalid input. Please enter a valid number.")
+      continue()
+      edit_task_field(field)
+  end
+end
+
+
+  defp get_new_value(:title) do
+    input = get_input("\nEnter NEW title: ")
+    case String.trim(input) do
+      "" ->
+        IO.puts("\nTitle cannot be empty. Please enter a title.")
+        continue()
+        get_new_value(:title)
+      title ->
+        title
     end
-    continue()
   end
 
-  @doc """
-  Gets the new value for a field.
-  """
-  defp get_new_value(:title), do: get_input("\nEnter NEW title: ")
-  defp get_new_value(:description), do: get_input("\nEnter NEW description: ")
+  defp get_new_value(:description) do
+    input = get_input("\nEnter NEW description: ")
+    case String.trim(input) do
+      "" ->
+        IO.puts("\nDescription cannot be empty. Please enter a description.")
+        continue()
+        get_new_value(:description)
+      description ->
+        description
+    end
+  end
+
 
   defp get_new_value(:due_date) do
-    IO.puts "\nEnter NEW Due Date (YYYY-MM-DD): "
-    today = Date.utc_today()
-    new_due_date = IO.gets("") |> String.trim()
-
-    case Date.from_iso8601(new_due_date) do
-      {:ok, entered_date} ->
-        if Date.compare(entered_date, today) >= 0 do
-          new_due_date
-        else
-          IO.puts "\nDue date must be today or in the future."
-          get_new_value(:due_date)  # Recursively call the function again
-        end
-
-      _ ->
-        IO.puts "\nInvalid date format. Please enter the date in the format YYYY-MM-DD."
-        get_new_value(:due_date)  # Recursively call the function again
-    end
+    get_due_date()
   end
 
-  @doc """
-  Gets the new status value for a task.
-  """
+
   defp get_new_value(:status) do
     IO.puts("""
 
@@ -260,44 +313,63 @@ end
 
   end
 
-  @doc """
-  Maps the status input to the corresponding status value.
-  """
+
   defp status("0"), do: "Not Started"
   defp status("1"), do: "In Progress"
   defp status("2"), do: "Done"
-  defp status(_), do: "Not Started"
+  defp status(_) do
+    IO.puts("\nERROR! Wrong input. Please try again.")
+    continue()
+    get_new_value(:status)
+  end
 
-  @doc """
-  Gets user input from the prompt.
-  """
+
   defp get_input(prompt) do
     IO.puts(prompt)
-    IO.gets("") |> String.trim()
+    input = IO.gets("") |> String.trim()
+    input
   end
 
   @doc """
   Deletes an existing task.
   """
- def delete_task() do
+def delete_task() do
   {tasks} = view_all_tasks()
 
   IO.puts("\n\n===== DELETE A TASK =====\n")
   IO.puts("\nEnter number of task to delete: ")
-  number = IO.gets("") |> String.trim() |> String.to_integer()
+  input = IO.gets("") |> String.trim()
 
-  if number > 0 && number <= length(tasks) do
-    task = Enum.at(tasks, number - 1)
-    case Tasks.delete_task(task) do
-      {:ok, _} -> IO.puts("\nTask deleted successfully.")
-      {:error, changeset} -> IO.puts("\nFailed to delete task: #{inspect(changeset.errors)}")
-    end
-  else
-    IO.puts("\nInvalid task number.")
+  case Integer.parse(input) do
+    {:error, _} ->
+      IO.puts("\nInvalid input. Please enter a number.")
+      continue()
+      delete_task()
+
+    {number, _} when number > 0 ->
+      if number <= length(tasks) do
+        task = Enum.at(tasks, number - 1)
+        case Tasks.delete_task(task) do
+          {:ok, _} ->
+            IO.puts("\nTask deleted successfully.")
+          {:error, changeset} ->
+            IO.puts("\nFailed to delete task: #{inspect(changeset.errors)}")
+        end
+      else
+        IO.puts("\nInvalid task number.")
+        continue()
+        delete_task()
+      end
+
+    _ ->
+      IO.puts("\nInvalid input. Please enter a valid number.")
+      continue()
+      delete_task()
   end
 
   continue()
-  end
+end
+
 
   @doc """
   Exits the CLI.
