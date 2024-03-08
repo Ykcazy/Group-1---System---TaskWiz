@@ -156,7 +156,6 @@ end
 
   defp get_task_description() do
     IO.puts ("\nEnter Description: ")
-    continue()
     description = IO.gets("") |> String.trim()
 
     if String.length(description) > 0 do
