@@ -174,20 +174,21 @@ end
 
     case Date.from_iso8601(due_date) do
       {:ok, entered_date} ->
-        if Date.compare(entered_date, today) >= 0 do
+        if Date.after?(entered_date, today) or entered_date == today do
           due_date
         else
-          IO.puts ("\nDue date must be today or in the future.")
+          IO.puts "\nDue date must be today or in the future."
           continue()
           get_due_date()  # Recursively call the function again
         end
 
       _ ->
-        IO.puts ("\nInvalid date format. Please enter the date in the format YYYY-MM-DD.")
+        IO.puts "\nInvalid date format. Please enter the date in the format YYYY-MM-DD."
         continue()
         get_due_date()  # Recursively call the function again
     end
   end
+
 
   @doc """
   Edits an existing task.
